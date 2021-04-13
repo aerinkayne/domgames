@@ -1,11 +1,16 @@
 document.addEventListener('DOMContentLoaded', ()=> {
     const doodler = document.getElementById('doodler');
+    doodler.style.backgroundImage = `url('./img/doodlejump.png')`;
+    const bird = document.getElementById('bird');
     const gameScreen = document.getElementById('gameScreen');
+    const background = document.getElementById('background-overlay');
+    background.style.backgroundImage = `url('./img/pexels-simon-berger-1323550.jpg')`;
     const counterDisplay = document.getElementById('counter');
 
     const GAMEW = 400;
     const GAMEH = 600;
-    const CHARW = 40;   
+    const CHARW = 60;  
+    const CHARH = 60; 
     const MINPLATFORMW = 60;
     const PLATFORMVARIANCE = 20;
     const PLATFORMH = 13;
@@ -18,10 +23,25 @@ document.addEventListener('DOMContentLoaded', ()=> {
     const AIRFRICTION = 0.05;
     const MAXRUNSPEED = 4;
     const MAXFALLSPEED = 3;
+    const BIRDW = 45;  //check styles too
+    const BIRDH = 35;
+    bird.style.width = `${BIRDW}px`
+    bird.style.height = `${BIRDH}px`
+    bird.style.backgroundImage = 'url("./img/birdR.png")'
 
     let isMovingLeft = false;
     let isMovingRight = false;
     let isFacingRight = null;
+    let addCollisionEffect = 0;
+    let dead = false;
+
+    //position, velocity, counter
+    let birdAnimationCounter = 0;
+    let birdPx = -200;
+    let birdPy = 3*GAMEH/5;
+    let birdVx = 2;
+    let birdVy = 1.25;
+    bird.style.left = `${birdPx}px`
     
     let Vx = 0;  //char x velocity
     let Vy = 0;  //used for character y velocity
@@ -32,6 +52,35 @@ document.addEventListener('DOMContentLoaded', ()=> {
     let canJump = true;
     let platformCount = 0; 
 
+    const toRadians = (angle) => {
+        return angle*Math.PI/180
+    }
+
+    const updateBird = () => {
+        birdAnimationCounter >= 360 ? birdAnimationCounter = 0 : birdAnimationCounter += 1;
+        if (birdPx > GAMEW + 160){
+            bird.style.backgroundImage = 'url("./img/birdL.png")'
+            birdVx *= -1;
+        } 
+        if (birdPx < -200) {
+            bird.style.backgroundImage = 'url("./img/birdR.png")'
+            birdVx *= -1;
+        }
+
+        birdVy = Math.sin(toRadians(birdAnimationCounter));
+        birdPx += birdVx;
+        birdPy += birdVy; 
+         
+        bird.style.left = `${birdPx}px`;
+        bird.style.bottom = `${Math.floor(birdPy)}px`
+
+        if (hasCollided(doodler, bird)){
+            doodler.style.transform = `rotate(180deg)`;
+            addCollisionEffect = 8;
+            dead = true;
+        }
+    }
+
     const moveRight = ()=> {
         if(Vx < MAXRUNSPEED) {
             Vx += RUNSPEED;
@@ -39,6 +88,7 @@ document.addEventListener('DOMContentLoaded', ()=> {
                 Vx = MAXRUNSPEED;
             }
         }
+        doodler.style.backgroundImage = 'url("./img/doodlejumpR.png")';
     }
     const moveLeft = ()=> {
         if(Vx > -MAXRUNSPEED) {
@@ -47,6 +97,7 @@ document.addEventListener('DOMContentLoaded', ()=> {
                 Vx = -MAXRUNSPEED;
             }
         }
+        doodler.style.backgroundImage = 'url("./img/doodlejump.png")';
     }
     const applyFriction = (friction) => {  
         if (Vx === 0) return;
@@ -59,7 +110,6 @@ document.addEventListener('DOMContentLoaded', ()=> {
         canJump = false;
         Vy = -JUMP_V;
     }
-    
     const updateVelocities = () => {
         if (isMovingRight){
             moveRight();
@@ -74,12 +124,15 @@ document.addEventListener('DOMContentLoaded', ()=> {
         if (!canJump && (!isMovingLeft && !isMovingRight)){
             applyFriction(AIRFRICTION);
         }
-        //update Vy if falling.
+        //falling.
         if (!canJump && Vy < MAXFALLSPEED){
             Vy += GRAVITY;
             if (Vy > MAXFALLSPEED){
                 Vy = MAXFALLSPEED;
             }
+        }
+        if(dead){
+            Vy = addCollisionEffect;
         }
     }
 
@@ -107,21 +160,23 @@ document.addEventListener('DOMContentLoaded', ()=> {
     document.addEventListener('keydown', controls);
     document.addEventListener('keyup', stopRunning);
 
-    const hasCollided = (doodler, platform)=> {
-        let doodlerBtm = parseInt(doodler.style.bottom);
+
+    const hasCollided = (doodler, object2)=> {
+        let doodlerBtm = parseInt(doodler.style.bottom); 
         let doodlerLeft = parseInt(doodler.style.left);
-        let platformBtm = parseInt(platform.style.bottom);
-        let platformLeft = parseInt(platform.style.left);
-        let platW = parseInt(platform.style.width);
-        //only collide from above
-        return (Vy >= 0 && 
-            doodlerBtm >= platformBtm && doodlerBtm <= platformBtm + PLATFORMH && 
-            doodlerLeft + CHARW >= platformLeft && doodlerLeft <= platformLeft + platW);
+        let objectBtm = parseInt(object2.style.bottom);
+        let objectLeft = parseInt(object2.style.left);
+        let objectW = parseInt(object2.style.width);
+        let objectH = parseInt(object2.style.height);
+        //positions are relative to bottom left origin
+        return (doodlerLeft + CHARW >= objectLeft && doodlerLeft <= objectLeft + objectW && 
+                doodlerBtm  + CHARH >= objectBtm && doodlerBtm <= objectBtm + objectH);
     } 
 
     const addPlatform = (height) => { 
         const newPlatform = document.createElement('div');
         newPlatform.style.width = `${MINPLATFORMW + Math.ceil(PLATFORMVARIANCE*Math.random())}px`;
+        newPlatform.style.height = `${PLATFORMH}px`;
         newPlatform.style.bottom = `${height}px`;  //new platform at top of gameScreen
         newPlatform.style.left = `${parseInt((GAMEW-MINPLATFORMW)*Math.random())}px`;  
         newPlatform.classList.add('platform');
@@ -141,21 +196,19 @@ document.addEventListener('DOMContentLoaded', ()=> {
     }
 
     const updatePlatforms = ()=> {
-        arrPlatforms.forEach(platform => {
-            if (hasCollided(doodler, platform)){ 
-                doodler.style.bottom = parseInt(platform.style.bottom) + PLATFORMH + 'px';
-                Vy = 0;
+        arrPlatforms.forEach(platform => { 
+            //only check collision with platforms from above    
+            if (!dead && Vy >= 0 && hasCollided(doodler, platform)){ 
+                Py = parseInt(platform.style.bottom) + PLATFORMH;
+                //player is same speed as platform if on platform
+                Py > 100 ? Vy = PLATFORMSPEED : Vy = 0;
                 canJump = true;
                 if (!platform.classList.contains('tagged')){
                     platform.classList.add('tagged');
                     platformCount++;
                 }
             } 
-            if (Py > 100){
-                //if char is on the platform while it's moving, adjust Py too.
-                if (canJump && Py === parseInt(platform.style.bottom) + PLATFORMH){
-                    Py -= PLATFORMSPEED; //relative to bottom origin
-                }
+            if (Py > 100){ 
                 platform.style.bottom = parseInt(platform.style.bottom) - PLATFORMSPEED + 'px';
             }
             //remove platforms that scroll off bottom, create new platform at top
@@ -183,12 +236,14 @@ document.addEventListener('DOMContentLoaded', ()=> {
         if(!arrPlatforms.length){     //initial platform setup
             createPlatforms();
         }
-        updateVelocities();
-        Px += Math.round(Vx);         //update char position
-        Py += -Math.round(Vy); //negative because position is relative to bottom.
         canJump = false;
         updatePlatforms(); //collision check and repositioning.
-        checkBoundaries(); //border bounds check
+        updateBird();
+        checkBoundaries(); //additional border bounds check.
+
+        updateVelocities();
+        Px += Math.round(Vx);     //update char position
+        Py += -Math.round(Vy);    //negative because position is relative to bottom.
         
         doodler.style.bottom = `${Py}px`;
         doodler.style.left = `${Px}px`;
